@@ -1,0 +1,1650 @@
+---
+title: "EdX HarvardX Data Science CYO Project - Concrete Compressive Strength"
+author: "Michael O'Donohoe"
+date: "6th September 2020"
+output:
+  word_document: default
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# 1.0 Introduction/Overview/Executive Summary
+This R Markdown document covers the devlopment of multiple machine learning models using the Concrete Compressive Strength Dataset downloaded from the UCI Machine Learning Respository (https://archive.ics.uci.edu/ml/datasets/Concrete+Compressive+Strength).  The models were compared for accuracy in predicting concrete compressive strength based omn a number of input variables.  Compressive Strength is a measure of the resistance of a material to failure under a compressive force (https://www.nrmca.org/aboutconcrete/cips/35p.pdf). This is a critical performance measurement for concrete used in construction and is typically measured by casting cubes or cylinders of concrete and measuring the compressive force required to cause failure.  The following machine learning algorithms were employed to build models:
+
+* Multiple Linear Regression (MLR)
+* Artificial Neural Networks (Ann)
+* Decision Trees
+* Random Forest
+* Support Vector Machine (SVM)
+* K Nearest Neighbour (Knn)
+* Naive-Bayes
+
+For the multiple linear regression and artificial neural networks models, the concrete compressive strength data was left as continous data.  However for the clssification algorithms (Decition Trees, Random Forest, Support Vector Machine, K nearest neighbour, Naive-Bayes), it was decided to Create four categories for the concrete compressive strength data based on typical classification found in industry:
+
+- Fail - <5Mpa
+- Low Strength 5-19MPa
+- Standard Strength 20-49MPa
+- High Strength >= 50MPa
+
+Overall this projects looked braodly at using many different machine learning algorithms for the purposes of learninga nd comparison rather than focussing deeply on just one (however the multiple linear regression model was evaluated in quite a significant level of depth)
+
+# 2.0 Methods/Analysis
+
+## 2.1 Install the required packages from CRAN
+A number of R packages required for the analysis (tidyverse, caret and lubridate) were loaded to RStudio.
+
+```{r eval = FALSE, echo = FALSE, warning = FALSE, results='hide', message=FALSE}
+if(!require(RCurl)) install.packages("RCurl", repos = "http://cran.us.r-project.org")
+if(!require(gdata)) install.packages("gdata", repos = "http://cran.us.r-project.org")
+if(!require(readxl)) install.packages("readxl", repos = "http://cran.us.r-project.org")
+if(!require(httr)) install.packages("httr", repos = "http://cran.us.r-project.org")
+if(!require(GGally)) install.packages("GGally", repos = "http://cran.us.r-project.org")
+if(!require(tidyverse)) install.packages("tidyverse", repos = "http://cran.us.r-project.org")
+if(!require(ggplot2)) install.packages("ggplot2", repos = "http://cran.us.r-project.org")
+if(!require(psych)) install.packages("psych", repos = "http://cran.us.r-project.org")
+if(!require(DMwr)) install.packages("DMwR", repos = "http://cran.us.r-project.org")
+if(!require(caret)) install.packages("caret", repos = "http://cran.us.r-project.org")
+if(!require(data.table)) install.packages("data.table", repos = "http://cran.us.r-project.org")
+if(!require(neuralnet)) install.packages("neuralnet", repos = "http://cran.us.r-project.org")
+if(!require(NeuralNetTools)) install.packages("NeuralNetTools", repos = "http://cran.us.r-project.org")
+if(!require(rpart)) install.packages("rpart", repos = "http://cran.us.r-project.org")
+if(!require(lmtest)) install.packages("lmtest", repos = "http://cran.us.r-project.org")
+if(!require(randomForest)) install.packages("randomForest", repos = "http://cran.us.r-project.org")
+if(!require(e1071)) install.packages("e1071", repos = "http://cran.us.r-project.org")
+if(!require(rattle)) install.packages("rattle", repos = "http://cran.us.r-project.org")
+if(!require(trafo)) install.packages("trafo", repos = "http://cran.us.r-project.org")
+if(!require(MASS)) install.packages("MASS", repos = "http://cran.us.r-project.org")
+if(!require(cluster)) install.packages("cluster", repos = "http://cran.us.r-project.org")
+if(!require(fpc)) install.packages("fpc", repos = "http://cran.us.r-project.org")
+if(!require(ggstatsplot)) install.packages("ggstatsplot", repos = "http://cran.us.r-project.org")
+if(!require(rcompanion)) install.packages("rcompanion", repos = "http://cran.us.r-project.org")
+if(!require(nortest)) install.packages("nortest", repos = "http://cran.us.r-project.org")
+if(!require(naivebayes)) install.packages("naivebayes", repos = "http://cran.us.r-project.org")
+if(!require(BBmisc)) install.packages("BBmisc", repos = "http://cran.us.r-project.org")
+if(!require(class)) install.packages("class", repos = "http://cran.us.r-project.org")
+if(!require(rpart)) install.packages("rpart", repos = "http://cran.us.r-project.org")
+if(!require(rattle)) install.packages("rattle", repos = "http://cran.us.r-project.org")
+if(!require(dplyr)) install.packages("dplyr", repos = "http://cran.us.r-project.org")
+if(!require(factoextra)) install.packages("factoextra", repos = "http://cran.us.r-project.org")
+if(!require(gmodels)) install.packages("gmodels", repos = "http://cran.us.r-project.org")
+if(!require(RColorBrewer)) install.packages("RColorBrewer", repos = "http://cran.us.r-project.org")
+if(!require(ROCR)) install.packages("ROCR", repos = "http://cran.us.r-project.org")
+if(!require(Metrics)) install.packages("Metrics", repos = "http://cran.us.r-project.org")
+if(!require(stats)) install.packages("stats", repos = "http://cran.us.r-project.org")
+if(!require(knitr)) install.packages("knitr", repos = "http://cran.us.r-project.org")
+```
+
+```{r echo = FALSE, warning = FALSE, results='hide', message=FALSE}
+library('RCurl')
+library('gdata')
+library('readxl')
+library('httr')
+library('GGally')
+library('tidyverse')
+library('ggplot2')
+library('psych')
+library('DMwR')
+library('lmtest')
+library('caret')
+library('data.table')
+library('neuralnet')
+library('NeuralNetTools')
+library('rpart')
+library('dplyr')
+library('randomForest')
+library('e1071')
+library('rattle')
+library('trafo')
+library('MASS')
+library('cluster')
+library('fpc')
+library('ggstatsplot')
+library('rcompanion')
+library('nortest')
+library('naivebayes')
+library('BBmisc')
+library('class')
+library('rpart')
+library('rattle')
+library('factoextra')
+library('gmodels')
+library('RColorBrewer')
+library('ROCR')
+library('Metrics')
+library('stats')
+library('knitr')
+```
+
+## 2.2 Load & Inryspect the Concrete Compressive Strength Dataset from the UCI Machine Learning Repository
+```{r warning = FALSE}
+ConDat <- read_excel("Data/Concrete_Data.xls")
+```
+
+**Inspect the data**
+```{r warning = FALSE}
+str(ConDat)
+head(ConDat)
+```
+The dataset consists of 1030 obs. of  9 variables mean compressive strength is 35.8MPa(Range 2.3-82.6MPa).  This seems reasonable as typical concrete compressive strength values for most normal applications are in the range 10-60MPa.
+
+**count NAs**
+```{r warning = FALSE}
+sapply(ConDat, function(x){sum(is.na(x))})
+```
+There are no na values
+
+**count blank entries**
+```{r warning = FALSE}
+sapply(ConDat, function(x){sum(x=='', na.rm=T)})
+```
+There are no blank entries
+No requirement to deal with NA's or missing values.
+
+**Rename the attributes to simplify & Recheck structure of the data**
+```{r warning = FALSE}
+names(ConDat) <- c("Cement", "Blast_Furnace_Slag", "Fly_Ash", "Water", "Superplasticizer", "Coarse_Aggregate", "Fine_Aggregate", "Age", "Compressive_Strength")
+summary(ConDat)
+str(ConDat)
+head(ConDat)
+```
+
+## 2.3 Exploratory Data Analysis
+**Use pairs function to provide visualization to check for correlations**
+```{r echo = FALSE, fig.cap= "pairs correlation", fig.align='center'}
+pairs(ConDat)
+```
+
+**Use pairs.panels function to provide visualization to check for correlations**
+```{r echo = FALSE, fig.cap= "pairs.panels correlation", fig.align='center'}
+pairs.panels(ConDat)
+```
+
+**Use GGally ggcorr function to visualize correlations**
+```{r echo = FALSE, fig.cap= "GGally visuallization of correlation", fig.align='center'}
+ggcorr(ConDat, label = TRUE, hjust = 0.70, size = 3, label_size = 5)
+```
+
+Due to the number of variables, it is difficult to see relationships using the pairs and pairs.panels functions.  The GGally ggcorr function does show the relationships more clearly and it is obvious that cement, superplasticizer and age are the three strongest relationships, however all three would be considered weak to moderate correlations.  In addition tehre are some interesting correlations between the independent variables that might be worth exploring further (for example the correlation betwwen superplastizer and fly ash, and that between age and water)
+
+It was decided to plot the relationships between each of the independent variables and the dependent variable (compressive strength) to show better visualizations of the correlations.
+
+**plot data to view relationships and calculate correlation**
+
+**Plot relationship between compressive strength and qty cement**
+```{r echo = FALSE, fig.cap="Compressive Strength vs. Qty Cement", fig.align='center'}
+plot(Compressive_Strength ~ Cement, data = ConDat, col = "blue")
+abline(lm(Compressive_Strength ~ Cement, data = ConDat), col="red")
+```
+Calculate correlation between compressive strength and qty cement
+```{r warning = FALSE}
+cor(ConDat$Compressive_Strength, ConDat$Cement)
+```
+
+There is a moderate positive correlation of 0.5
+
+**Plot relationship between compressive strength and qty blast furnace slag**
+```{r echo = FALSE, fig.cap="Compressive Strength vs. Qty Blast Furnace Slag", fig.align='center'}
+plot(Compressive_Strength ~ Blast_Furnace_Slag, data = ConDat, col = "blue")
+abline(lm(Compressive_Strength ~ Blast_Furnace_Slag, data = ConDat), col="red")
+```
+
+Calculate correlation between compressive strength and qty blast furnace slag
+```{r warning = FALSE}
+cor(ConDat$Compressive_Strength, ConDat$Blast_Furnace_Slag)
+```
+
+There is only a very weak positive correlation of 0.13
+
+**Plot relationship between compressive strength and qty fly ash**
+```{r echo = FALSE, fig.cap="Compressive Strength vs. Qty Fly Ash", fig.align='center'}
+plot(Compressive_Strength ~ Fly_Ash, data = ConDat, col = "blue")
+abline(lm(Compressive_Strength ~ Fly_Ash, data = ConDat), col="red")
+```
+Calculate correlation between compressive strength and qty fly ash
+```{r warning = FALSE}
+cor(ConDat$Compressive_Strength, ConDat$Fly_Ash)
+```
+
+There is only a very weak negative correlation of -0.11
+
+**Plot relationship between compressive strength and qty water**
+```{r echo = FALSE, fig.cap="Compressive Strength vs. Qty Water", fig.align='center'}
+plot(Compressive_Strength ~ Water, data = ConDat, col = "blue")
+abline(lm(Compressive_Strength ~ Water, data = ConDat), col="red")
+```
+Calculate correlation between compressive strength and qty water
+```{r warning = FALSE}
+cor(ConDat$Compressive_Strength, ConDat$Water)
+```
+
+There is a weak negative correlation of -0.29 
+
+**Plot relationship between compressive strength and qty superplasticizer**
+```{r echo = FALSE, fig.cap="Compressive Strength vs. Qty Superplasticizer", fig.align='center'}
+plot(Compressive_Strength ~ Superplasticizer, data = ConDat, col = "blue")
+abline(lm(Compressive_Strength ~ Superplasticizer, data = ConDat), col="red")
+```
+Calculate correlation between compressive strength and qty superplasticizer
+```{r warning = FALSE}
+cor(ConDat$Compressive_Strength, ConDat$Superplasticizer)
+```
+
+There is a Weak positive correlation of 0.37
+
+**Plot relationship between compressive strength and qty coarse aggregate**
+```{r echo = FALSE, fig.cap="Compressive Strength vs. Qty Coarse Aggregate", fig.align='center'}
+plot(Compressive_Strength ~ Coarse_Aggregate, data = ConDat, col = "blue")
+abline(lm(Compressive_Strength ~ Coarse_Aggregate, data = ConDat), col="red")
+```
+
+Calculate correlation between compressive strength and qty coarse aggregate
+```{r warning = FALSE}
+cor(ConDat$Compressive_Strength, ConDat$Coarse_Aggregate)
+```
+
+There is only a very weak negative correlation of -0.16
+
+**Plot relationship between compressive strength and qty fine aggregate**
+```{r echo = FALSE, fig.cap="Compressive Strength vs. Qty Fine Aggreate", fig.align='center'}
+plot(Compressive_Strength ~ Fine_Aggregate, data = ConDat, col = "blue")
+abline(lm(Compressive_Strength ~ Fine_Aggregate, data = ConDat), col="red")
+```
+Calculate correlation between compressive strength and qty fine aggegrate
+```{r warning = FALSE}
+cor(ConDat$Compressive_Strength, ConDat$Fine_Aggregate)
+```
+
+None to very weak negative relationship observed
+
+**Plot relationship between compressive strength and age**
+```{r echo = FALSE, fig.cap="Compressive Strength vs. Age", fig.align='center'}
+plot(Compressive_Strength ~ Age, data = ConDat, col = "blue")
+abline(lm(Compressive_Strength ~ Age, data = ConDat), col = "red")
+```
+Calculate correlation between compressive strength and age
+```{r warning = FALSE}
+cor(ConDat$Compressive_Strength, ConDat$Age)
+```
+
+There is a weak positive correlation of 0.33
+
+**Conclusions from Exploratory Data Analysis**
+
+Based on this initial evaluation, it appears that that the most significant positive
+correlations were achieved for Cement (0.4978327), Superplasticizer (0.3661023) and
+Age (0.32887).  The most significant negative correlation is for Water (-0.2896135).
+None of the correlations are very strong which (in conjunction with the observatiuons from the scatterplots) may indicate that the relationships between Compressive_Strength and the other attributes in the dataset may be non-linear and may require further transformation to develop a more accurate linear regression model.
+
+
+## 2.4 Multiple Linear Regression Model
+
+**Load data and rename columns**
+```{r echo = FALSE, warning = FALSE}
+ConDat <- read_excel("Data/Concrete_Data.xls")
+
+names(ConDat) <- c("Cement", "Blast_Furnace_Slag", "Fly_Ash", "Water", "Superplasticizer", "Coarse_Aggregate", "Fine_Aggregate", "Age", "Compressive_Strength")
+```
+
+**Split ConDat data into training (80%) and validation (20%) sets**
+```{r echo = FALSE, warning = FALSE}
+set.seed(123)
+TrainConDat <- sample(nrow(ConDat),0.8*nrow(ConDat), replace=FALSE)
+TrainSet <- ConDat[TrainConDat,]
+ValidSet <- ConDat[-TrainConDat,]
+```
+
+**Build model csmodel1 with all parameters included**
+
+```{r warning = FALSE}
+csmodel1 <- lm(Compressive_Strength~., data=TrainSet)
+```
+
+evaluate csmodel1
+```{r echo = FALSE, warning = FALSE}
+summary(csmodel1)
+```
+
+The Adj  R-squared of 0.6205 so model explains about 62% of the variability
+
+Plot & check correlation between response in ValidSet and response of csmodel1 built using TrainSet
+
+```{r echo = FALSE, fig.cap="Correlation between predicted and actual results for csmodel1", fig.align='center'}
+plot(ValidSet$Compressive_Strength, predict(csmodel1, ValidSet),
+     xlim =c(0,85), ylim=c(0,85), xlab= "actual", ylab = "predicted",
+     main = "Compressive Strength - csmodel1")
+abline(lm(ValidSet$Compressive_Strength ~ predict(csmodel1, ValidSet)), col = "red")
+```
+
+```{r echo = FALSE, warning = FALSE}
+cor(ValidSet$Compressive_Strength, predict(csmodel1, ValidSet))
+```
+
+Correlation is about 76% so model needs more work to improve accuracy
+
+**Check for "LINE" assumptions for csmodel1 multiple linear regression model**
+
+Linear regression models make some assumptions about the data which must be assessed to check the validity of the model.  These four key assumptions are often given the acronym LINE:
+
+*L - Linearity (There is some concern over this based on scatter plots above)
+*I - Independence
+*N - Normality
+*E - Equal Variances (homoscedasticity)
+
+
+**Linearity & Equal Variance**
+
+plot residuals to check for linearity and equal variance
+
+```{r echo = FALSE, fig.cap="residual plot for csmodel1", fig.align='center'}
+plot(csmodel1)
+layout(matrix(1:2,2,2)) 
+```
+
+The residual plot looks reasonably randomly distributed around the zero line however there some concerns that there may be "funnelling" or "bowing" indicating that data is heteroscedastic and that data transformation may be required for modelling
+
+**Independence**
+
+The Durbin-Watson test was performed to check for Independence
+```{r echo = FALSE, warning = FALSE}
+dwtest(csmodel1)
+```
+
+If there is no autocorrelation the Durbin-Watson statistic should be between 1.5 and 2.5 and the p-value will be above 0.05.  With a DW value of 2.0669 and p value of 0.8322 there is no evidence of autocorrelation 
+
+
+**Normality**
+Plot histogram and normal Q-Q plot to confirm residuals are normally distributed
+
+```{r echo = FALSE, fig.cap="Histogram of residuals for csmodel1", fig.align='center'}
+hist(residuals(csmodel1), col="gray")
+```
+
+```{r echo = FALSE, fig.cap="QQ-Plot of residuals for csmodel1", fig.align='center'}
+qqnorm(residuals(csmodel1))
+```
+
+The data looks to be somewhat normally distributed but some deviations at extremes
+
+
+The Shapiro-wilk and Anderson-Darling tests were completed to confirm residuals are normally distributed
+```{r echo = FALSE, warning=FALSE}
+shapiro.test(csmodel1$residuals)
+ad.test(csmodel1$residuals)
+```
+
+Data looks not to be normally distributed (P value <0.05)
+
+```{r eval=FALSE, echo = FALSE}
+# Calculate confidence and prediction intervals for csmodel1 (show first 20 rows only)**
+# Confidence Interval
+confcs1 <- predict(csmodel1,ValidSet,interval="confidence")
+head(confcs1, 20)
+# Prediction Interval
+predcs1 <- predict(csmodel1,ValidSet,interval="predict")
+head(predcs1, 20)
+
+# Build Stepwise Compressive Strength Forwards, Backwards and Stepwise
+# Backward Elimination
+csmodel2 <- step(csmodel1, direction="backward")
+csmodel2
+summary(csmodel2)
+
+# Forward Selection
+csmodel3 <- step(csmodel1, direction="forward")
+csmodel3
+summary(csmodel3)
+
+# Stepwise Selection
+csmodel4 <- step(csmodel1, direction="both")
+csmodel4
+summary(csmodel4)
+
+# Stepwise Compressive Strength Models Forwards, Backwards and Stepwise
+# do not result in improved Adjusted R-squared value
+
+# Build model eliminating least significant parameter (coarse aggregate)
+csmodel5 <- lm(Compressive_Strength~ Cement + Blast_Furnace_Slag + Fly_Ash + Water + Superplasticizer + Fine_Aggregate + Age, data=TrainSet)
+csmodel5
+summary(csmodel5)
+
+# This did not improve the Adjusted R-squared value but did simplify the model
+
+# Build model eliminating two least significant parameter (coarse aggregate & fine aggregate)
+csmodel6 <- lm(Compressive_Strength~ Cement + Blast_Furnace_Slag + Fly_Ash + Water + Superplasticizer + Age, data=TrainSet)
+csmodel6
+summary(csmodel6)
+
+# Again this did not improve the Adjusted R-squared value but did further simplify the model
+
+# Check the simplified for "LINE" requirements for linear regression
+# L - Linearity
+# I - Independence 
+# N - Normality
+# E - Equal Variances
+
+# plot residuals
+plot(csmodel6)
+# residual plot looks reasonably randomly distributed around the zero line
+# however some concerns that there may be "funnelling" or "bowing" indicating
+# that data is heteroscedastic and that transformation may be required
+
+
+# Perfrom Durbin-Watson test to check for Independence
+dwtest(csmodel6)
+# If there is no autocorrelation the Durbin-Watson statistic should be between 1.5 and 2.5
+# and the p-value will be above 0.05.
+# With a DW value of 2.0612 and p value of 0.8106 there is no evidence of autocorrelation 
+
+
+# Plot histogram and normal Q-Q plot for csmodel6 to confirm residuals are normally distributed
+# Plot histogram
+hist(residuals(csmodel6), col="gray")
+
+# Plot Q-Q Plot
+qqnorm(residuals(csmodel6))
+
+# Complete Shapiro-wilk test to confirm residuals are normally distributed
+shapiro.test(csmodel6$residuals)
+# Data looks not to be normally distributed (P value <0.05)
+
+# Complete Anderson_Darling test to confirm residuala are normal distributed
+ad.test(csmodel6$residuals)
+# Data looks not to be normally distributed (P value <0.05
+```
+
+** Data Transformation to Improve mode1**
+
+It was decided to attempt some transformations to see if correlation can be improved by using Transformations on data to improve linearity.  The following trsnadoemations were tried:
+
+* square root
+* squared
+* log
+* exp
+
+**Compressive strength and qty cement transformations**
+
+```{r warning = FALSE}
+cor(ConDat$Compressive_Strength, ConDat$Cement)
+cor(ConDat$Compressive_Strength, sqrt(ConDat$Cement))
+cor(ConDat$Compressive_Strength, (ConDat$Cement^2))
+cor(ConDat$Compressive_Strength, log(ConDat$Cement))
+cor(ConDat$Compressive_Strength, exp(ConDat$Cement))
+```
+
+There was no correlation improvement from these transformations
+
+**Compressive strength and qty blast furnace slag**
+```{r warning = FALSE}
+cor(ConDat$Compressive_Strength, ConDat$Blast_Furnace_Slag)
+cor(ConDat$Compressive_Strength, sqrt(ConDat$Blast_Furnace_Slag))
+cor(ConDat$Compressive_Strength, (ConDat$Blast_Furnace_Slag^2))
+cor(ConDat$Compressive_Strength, log(ConDat$Blast_Furnace_Slag))
+cor(ConDat$Compressive_Strength, exp(ConDat$Blast_Furnace_Slag))
+```
+
+There was no correlation improvement from these transformations
+
+**Compressive strength and qty fly ash**
+
+```{r warning = FALSE}
+cor(ConDat$Compressive_Strength, ConDat$Fly_Ash)
+cor(ConDat$Compressive_Strength, sqrt(ConDat$Fly_Ash))
+cor(ConDat$Compressive_Strength, (ConDat$Fly_Ash^2))
+cor(ConDat$Compressive_Strength, log(ConDat$Fly_Ash))
+cor(ConDat$Compressive_Strength, exp(ConDat$Fly_Ash))
+```
+
+There was correlation improvement from these transformations
+
+**Compressive strength and qty water**
+
+```{r warning = FALSE}
+cor(ConDat$Compressive_Strength, ConDat$Water)
+cor(ConDat$Compressive_Strength, sqrt(ConDat$Water))
+cor(ConDat$Compressive_Strength, (ConDat$Water^2))
+cor(ConDat$Compressive_Strength, log(ConDat$Water))
+cor(ConDat$Compressive_Strength, exp(ConDat$Water))
+```
+
+There was no correlation improvement from these transformations
+
+**Compressive strength and qty superplasticizer**
+
+```{r warning = FALSE}
+cor(ConDat$Compressive_Strength, ConDat$Superplasticizer)
+cor(ConDat$Compressive_Strength, sqrt(ConDat$Superplasticizer))
+cor(ConDat$Compressive_Strength, (ConDat$Superplasticizer^2))
+cor(ConDat$Compressive_Strength, log(ConDat$Superplasticizer))
+cor(ConDat$Compressive_Strength, exp(ConDat$Superplasticizer))
+```
+
+There was no correlation improvement from these transformations
+
+**Compressive strength and qty coarse aggregate**
+
+```{r warning = FALSE}
+cor(ConDat$Compressive_Strength, ConDat$Coarse_Aggregate)
+cor(ConDat$Compressive_Strength, sqrt(ConDat$Coarse_Aggregate))
+cor(ConDat$Compressive_Strength, (ConDat$Coarse_Aggregate^2))
+cor(ConDat$Compressive_Strength, log(ConDat$Coarse_Aggregate))
+cor(ConDat$Compressive_Strength, exp(ConDat$Coarse_Aggregate))
+```
+
+There was no correlation improvement from these transformations
+
+**Compressive strength and qty fine aggregate**
+
+```{r warning = FALSE}
+cor(ConDat$Compressive_Strength, ConDat$Fine_Aggregate)
+cor(ConDat$Compressive_Strength, sqrt(ConDat$Fine_Aggregate))
+cor(ConDat$Compressive_Strength, (ConDat$Fine_Aggregate^2))
+cor(ConDat$Compressive_Strength, log(ConDat$Fine_Aggregate))
+cor(ConDat$Compressive_Strength, exp(ConDat$Fine_Aggregate))
+```
+
+There was no correlation improvement from these transformations
+
+**Compressive strength and age**
+
+```{r warning = FALSE}
+cor(ConDat$Compressive_Strength, ConDat$Age)
+cor(ConDat$Compressive_Strength, sqrt(ConDat$Age))
+cor(ConDat$Compressive_Strength, (ConDat$Age^2))
+cor(ConDat$Compressive_Strength, log(ConDat$Age))
+cor(ConDat$Compressive_Strength, exp(ConDat$Age))
+```
+
+There was no correlation improvement from these transformations
+
+At this point, some background research (https://courses.washington.edu/cm425/strength.pdf) seemed to support the observation that some of the relationships associated with concrete compressive strength may not be linear and would require a transformation. In addition the background research also identified an important relationship between concrete compressive strength and Water/Cement Ratio (a relationship known as Abram's law). Based on this finding transfromations of this ratio were also completed
+
+**Compressive strength and water/cement based on Abrams law**
+
+```{warning = FALSE}
+cor(ConDat$Compressive_Strength, (ConDat$Water/ConDat$Cement))
+cor(ConDat$Compressive_Strength, sqrt(ConDat$Water/ConDat$Cement))
+cor(ConDat$Compressive_Strength, ((ConDat$Water/ConDat$Cement)^2))
+cor(ConDat$Compressive_Strength, log(ConDat$Water/ConDat$Cement))
+cor(ConDat$Compressive_Strength, exp(ConDat$Water/ConDat$Cement))
+```
+
+log(Water/Cement) also shows a strong correlation to compressive strength.  
+log(Age) also shows significant improvement in correlation to compressive strength.
+
+**Plot relationship between compressive strength and log(Age)**
+
+```{r echo = FALSE, fig.cap="Correlation between Compressive Strength and log(Age)", fig.align='center'}
+plot(Compressive_Strength ~ log(Age), data = ConDat, col="green")
+abline(lm(Compressive_Strength ~ log(Age), data = ConDat), col="red")
+```
+
+**Plot relationship between compressive strength and log(water/cement)**
+```{r echo = FALSE, fig.cap="Correlation between Compressive Strength and log(Water/Cement)", fig.align='center'}
+plot(Compressive_Strength ~ log(Water/Cement), data = ConDat, col="green")
+abline(lm(Compressive_Strength ~ log(Water/Cement), data = ConDat), col="red")
+```
+
+The multiple linear regression model was rebuilt as csmodel7 replacing Age with log(Age) and water and Cement variables with log(water/cement) to see if model accuracy is improved
+
+``` {r echo = FALSE, warning = FALSE}
+csmodel7 <- lm(Compressive_Strength~ log(Water/Cement) + Blast_Furnace_Slag + Fly_Ash + Superplasticizer + log(Age), data=TrainSet)
+csmodel7
+summary(csmodel7)
+```
+
+This model is much better with an Adjusted R-squared value of 0.8081
+
+**Check for "LINE" assumptions for csmodel7 multiple linear regression model**
+
+*L - Linearity (There is some concern over this based on scatter plots above)
+*I - Independence
+*N - Normality
+*E - Equal Variances
+
+**Linearity and Equal Varience**
+Plot residuals for csmodel7
+
+```{r echo = FALSE, fig.cap="Residual plot for csmodel7", fig.align='center'}
+plot(csmodel7)
+layout(matrix(1:2,2,2))
+```
+
+The Residual plot looks reasonably randomly distributed around the zero line.  There are still some slight concerns with "funneling" but seems to be better than previous models
+
+**Independence**
+
+The Durbin-Watson test was completed to check for Independence
+
+```{r warning = FALSE}
+dwtest(csmodel7)
+```
+
+If there is no autocorrelation the Durbin-Watson statistic should be between 1.5 and 2.5 and the p-value will be above 0.05.  With a DW value of 2.2018 and p value of 0.9981 there is no evidence of autocorrelation 
+
+**Normality**
+
+Plot histogram and normal Q-Q plot for csmodel7 to confirm residuals are normally distributed
+
+```{r echo = FALSE, fig.cap="Histogram of residuals for csmodel7", fig.align='center'}
+hist(residuals(csmodel7), col="gray")
+```
+
+```{r echo = FALSE, fig.cap="QQ-Plot of residuals for csmodel7", fig.align='center'}
+qqnorm(residuals(csmodel7))
+```
+
+The Shapiro-wilk and Anderson_Darling tests were completed to confirm residuals are normally distributed
+
+```{r echo = FALSE, warning = FALSE}
+shapiro.test(csmodel7$residuals)
+ad.test(csmodel7$residuals)
+```
+
+
+The Data looks not to be normally distributed (P value <0.05),  Although this is not an ideal situation, it does not necessarily invalidate the model.  Homoscedasticity and linearity tend to be more important than normality for linear regression models and with large datasets, normality of lesser importance for a model to be valid.  (Schmidt, A. F. & Finan, C., 2018. Linear regression and the normality assumption. Journal of Clinical Epidemiology, Volume 98, pp. 146-151).  As the Training dataset has >800 data points, the requirement for normality for the model to be valid is less important. 
+
+**Calculate confidence and prediction intervals for csmodel7 (show first 20 rows only)**
+
+Confidence Interval
+
+```{r echo = FALSE, warning = FALSE}
+confcs7 <- predict(csmodel7,newdata = ValidSet, interval="confidence")
+head(confcs7, 20)
+```
+
+Prediction Interval
+
+```{r echo = FALSE, warning = FALSE}
+predcs7 <- predict(csmodel7,newdata = data.frame(ValidSet), interval="prediction")
+head(predcs7, 20)
+```
+
+**Plot & check correlation between response in ValidSet and response of csmodel7 built using TrainSet**
+
+```{r echo = FALSE, fig.cap="Residual plot for csmodel7", fig.align='center'}
+plot(ValidSet$Compressive_Strength, predict(csmodel7, ValidSet),
+     xlim =c(0,85), ylim=c(0,85), xlab= "actual", ylab = "predicted",
+     main = "Compressive Strength - csmodel7")
+abline(lm(ValidSet$Compressive_Strength ~ predict(csmodel7, ValidSet)), col = "red")
+```
+
+```{r echo = FALSE, warning = FALSE}
+cor(ValidSet$Compressive_Strength, predict(csmodel7, ValidSet))
+```
+
+The Correlation has improved to about 90% for csmodel7
+
+**Calculate RMSE and MAPE for csmodel7**
+
+```{r echo = FALSE, warning = FALSE}
+CSPred <- predict(csmodel7, ValidSet)
+actuals_preds <- data.frame(cbind(actuals=ValidSet$Compressive_Strength, predicteds=CSPred))
+DMwR::regr.eval(actuals_preds$actuals, actuals_preds$predicteds)
+
+```
+The RMSE of the model is 7.3 and the MAPE is only 0.22 indicating a reasonably accurate model.
+
+**Conclusions from Multiple lInear Regression Model**
+
+The final Multiple Linear Regression model (after transformation of the data) has an accuracy of 90% which represents a good model. The Adjusted R-squared value is 0.8081 which means that the model explains about 80% of the variability.  The RMSE of the model is 7.3 and the MAPE is only 0.22 indicating a reasonably accurate model.  The model meets all of the assumptions for a regression model apart from normality.  Homoscedasticity and linearity tend to be more important than normality for linear regression models and with large datasets, normality of lesser importance for a model to be valid.  (Schmidt, A. F. & Finan, C., 2018. Linear regression and the normality assumption. Journal of Clinical Epidemiology, Volume 98, pp. 146-151).  As the Training dataset has >800 data points, the requirement for normality for the model to be valid is less important. 
+
+## 2.5 - Artificial Neural Network Modelling
+
+```{r echo = FALSE, warning = FALSE}
+ConDat <- read_excel("Data/Concrete_Data.xls")
+names(ConDat) <- c("Cement", "Blast_Furnace_Slag", "Fly_Ash", "Water", "Superplasticizer", "Coarse_Aggregate", "Fine_Aggregate", "Age", "Compressive_Strength")
+```
+
+**Normalize Dataset**
+
+It is necessary to normalize the ConDat dataset as Neural Networks work best when input data are scaled to a narrow range arond zero,  This was performed by creating a function to normalize data.  The dataset (apart from the Concrete Strength Category) was then normalized using the function
+
+```{r echo = FALSE, warning = FALSE}
+norm_function <- function(x){return((x-min(x))/(max(x)-min(x)))}
+ConDatNorm <- as.data.frame(lapply(ConDat, norm_function))
+summary(ConDatNorm)
+str(ConDatNorm)
+head(ConDatNorm)
+```
+
+**Create Training and Validation Datasets**
+
+The data was Split Data into Training Set (70%) and Validation Set (30%)
+
+```{r echo = FALSE, warning = FALSE}
+set.seed(123)
+annTrainSet <- ConDatNorm[1:721, ]  
+annValidSet <- ConDatNorm[722:1030, ]
+summary(annTrainSet)
+summary(annValidSet)
+```
+
+
+**Build first ANN model annconmodel_1**
+
+```{r echo = FALSE, warning = FALSE}
+set.seed(123)
+ann_conmodel1 <- neuralnet(Compressive_Strength ~.,data = annTrainSet)
+```
+
+**Plot first ANN model**
+
+```{r echo = FALSE, fig.cap="Plot of ann_conmodel1", fig.align='center'}
+plot(ann_conmodel1)
+```
+
+**Plot first ANN model with plotnet**
+
+```{r echo = FALSE, fig.cap="Plot of ann_conmodel1 using plotnet", fig.align='center'}
+par(mar = numeric(4), family = 'serif')
+plotnet(ann_conmodel1, alpha = 0.6)
+```
+
+**Check prediction accuracy of first ANN model**
+
+```{r echo = FALSE, warning = FALSE}
+ann_results <- compute(ann_conmodel1, annValidSet[1:8])
+ann_predict <- ann_results$net.result
+cor(ann_predict, annValidSet$Compressive_Strength)
+```
+
+**Build second ANN model using 5 hidden nodes**
+
+```{r echo = FALSE, warning = FALSE}
+set.seed(123)
+ann_conmodel2 <- neuralnet(Compressive_Strength ~., data = annTrainSet, hidden =5)
+```
+
+**Plot second ANN model ann_conmodel2**
+```{r echo = FALSE, fig.cap="Plot of ann_conmodel2", fig.align='center'}
+plot(ann_conmodel2)
+```
+
+Plot second ANN model with plotnet
+
+```{r echo = FALSE, fig.cap="Plot of ann_conmodel1 with plotnet", fig.align='center'}
+par(mar = numeric(4), family = 'serif')
+plotnet(ann_conmodel2, alpha = 0.6)
+```
+
+**check prediction accuracy of second ANN model**
+
+```{r echo = FALSE, warning=FALSE}
+ann_results2 <- compute(ann_conmodel2, annValidSet[1:8])
+ann_predict2 <- ann_results2$net.result
+cor(ann_predict2, annValidSet$Compressive_Strength)
+```
+
+**Build third ANN model using 5 hidden neurons and logistic activation function**
+
+```{r echo = FALSE, warning = FALSE}
+set.seed(123)
+ann_conmodel3 <- neuralnet(Compressive_Strength ~., data = annTrainSet, hidden = 3,
+                           act.fct = "logistic")
+```
+
+**Plot third ANN model**
+
+```{r echo = FALSE, fig.cap="Plot of ann_conmodel3", fig.align='center'}
+plot(ann_conmodel3)
+```
+
+**Plot third ANN model with plotnet**
+
+```{r echo = FALSE, fig.cap="Plot of ann_conmodel3 with plotnet", fig.align='center'}
+par(mar = numeric(4), family = 'serif')
+plotnet(ann_conmodel3, alpha = 0.6)
+```
+
+**Check prediction accuracy of third ANN model**
+
+```{r echo = FALSE, warning = FALSE}
+ann_results3 <- compute(ann_conmodel3, annValidSet[1:8])
+ann_predict3 <- ann_results3$net.result
+cor(ann_predict3, annValidSet$Compressive_Strength)
+```
+
+**Conclusions from Artificial Neural Network Model**
+
+The best ANN model (after transformation of the data) was achieved using 5 hidden neurons and logistic activation function.  The model has an accuracy of 79% which represents a reasobally accurate model.  THis model is not as good as the multiple linear regression model.  ANN is best used for very large datasets rather than small data sets like this.
+
+## 2.6 Data Visualization for Classification Algorithms
+
+It was decided to use notched box plots to see which features showed the best separation for Concrete Strength and therefore which features might be most useful in classification machine learning alogrithms
+
+```{r echo = FALSE, warning = FALSE, message=FALSE}
+ConDat <- read_excel("Data/Concrete_Data.xls")
+names(ConDat) <- c("Cement", "Blast_Furnace_Slag", "Fly_Ash", "Water", "Superplasticizer", "Coarse_Aggregate", "Fine_Aggregate", "Age", "Compressive_Strength")
+```
+**Create 4 categories for classification purposes**
+
+The concrete comprerssive strengh data was classifiied into four categories:
+
+* Fail - <5Mpa
+* Low Strength 5-19MPa
+* Standard Strength 20-49MPa
+* High Strength >= 50MPa
+
+Concrete classification is based on compressive strength in MPa was obtained from the website linked below:
+
+https://www.baseconcrete.co.uk/different-types-of-concrete-grades-and-their-uses/
+
+
+```{r echo = FALSE, warning = FALSE}
+ConDat$Concrete_Category[ConDat$Compressive_Strength <5] <- 1
+ConDat$Concrete_Category[ConDat$Compressive_Strength >=5 & ConDat$Compressive_Strength <20] <- 2
+ConDat$Concrete_Category[ConDat$Compressive_Strength >=20 & ConDat$Compressive_Strength<50] <- 3
+ConDat$Concrete_Category[ConDat$Compressive_Strength >=50] <- 4
+str(ConDat)
+summary(ConDat)
+head(ConDat)
+
+ConDat = subset(ConDat, select = -c(9))
+
+ConDat$Concrete_Category <- factor(x=ConDat$Concrete_Category,
+                                   levels=sort(unique(ConDat$Concrete_Category)),
+                                   labels = c( "Fail", "Low Strength", "Standard Strength", "High Strength"))
+
+str(ConDat)
+summary(ConDat)
+head(ConDat)
+```
+
+**Visualize features by strength cartegory using notched box plots**
+
+It was decided to use box plots to visualize which features showed best separataion based on compressive strength category.  If there is no overlap of the notches then there is a signifcant difference in the median values. 
+
+**Cement**
+
+```{r echo = FALSE, warning = FALSE, fig.cap="Cement", fig.align='center'}
+par(mfrow=c(1,1))
+boxplot(ConDat$Cement ~ ConDat$Concrete_Category,
+        notch=TRUE, staplewex = 1, main = "Cement",
+        ylab="Kg/m^3", col="blue")
+```
+
+The cement variable seems to show good separation based on compressive strength category.
+
+**Blast Furnace Slag**
+
+```{r echo = FALSE, warning = FALSE, fig.cap="Blast Furnace Slag", fig.align='center'}
+par(mfrow=c(1,1))
+boxplot(ConDat$Blast_Furnace_Slag ~ ConDat$Concrete_Category,
+        notch=TRUE, staplewex = 1, main = "Blast Furnace Slag",
+        ylab="Kg/m^3", col="blue")
+
+```
+
+The blast furnace slag variable does not show good separation based on compressive strength category.
+
+**Fly Ash**
+
+```{r echo = FALSE, warning = FALSE, fig.cap="Fly Ash", fig.align='center'}
+par(mfrow=c(1,1))
+boxplot(ConDat$Fly_Ash ~ ConDat$Concrete_Category,
+        notch=TRUE, staplewex = 1, main = "Fly Ash",
+        ylab="Kg/m^3", col="blue")
+```
+
+The fly ash variable does not show good separation based on compressive strength category.
+
+**Water**
+
+```{r echo = FALSE, warning = FALSE, fig.cap="Water", fig.align='center'}
+par(mfrow=c(1,1))
+boxplot(ConDat$Water ~ ConDat$Concrete_Category,
+        notch=TRUE, staplewex = 1, main = "Water",
+        ylab="Kg/m^3", col="blue")
+```
+
+The water variable seems to show a reasonably good separation based on compressive strength category.
+
+**Superplasticizer**
+
+```{r echo = FALSE, warning = FALSE, fig.cap="Superplasticizer", fig.align='center'}
+par(mfrow=c(1,1))
+boxplot(ConDat$Superplasticizer ~ ConDat$Concrete_Category,
+        notch=TRUE, staplewex = 1, main = "Superplasticizer",
+        ylab="Kg/m^3", col="blue")
+```
+
+The superplasticizer variable seems to show a reasonably good separation based on compressive strength category.
+
+**Coarse Aggregate**
+
+```{r echo = FALSE, warning = FALSE, fig.cap="Coarse Aggregate", fig.align='center'}
+par(mfrow=c(1,1))
+boxplot(ConDat$Coarse_Aggregate ~ ConDat$Concrete_Category,
+        notch=TRUE, staplewex = 1, main = "Coarse Aggregate",
+        ylab="Kg/m^3", col="blue")
+```
+
+The coarse aggregate variable does not show good separation based on compressive strength category.
+
+**Fine Aggregate**
+
+```{r echo = FALSE, warning = FALSE, fig.cap="Fine Aggregate", fig.align='center'}
+par(mfrow=c(1,1))
+boxplot(ConDat$Fine_Aggregate ~ ConDat$Concrete_Category,
+        notch=TRUE, staplewex = 1, main = "Fine Aggregate",
+        ylab="Kg/m^3", col="blue")
+```
+
+The fine aggregate variable seems to show reasonably good separation based on compressive strength category.
+
+**Age**
+
+```{r echo = FALSE, warning = FALSE, fig.cap="Age", fig.align='center'}
+par(mfrow=c(1,1))
+boxplot(ConDat$Age ~ ConDat$Concrete_Category,
+        notch=TRUE, staplewex = 1, main = "Age",
+        ylab="days", col="blue")
+```
+
+**Conclusions from notched box plot viusalization**
+
+Based on the notched box plots, the features which might be best suited for separating the classifications are Cement, Age, Water, Superplasticizer and Fine Aggregate.
+
+
+##2.7 - Decision Tree Modelling##
+
+```{r echo = FALSE, warning = FALSE}
+ConDat <- read_excel("Data/Concrete_Data.xls")
+names(ConDat) <- c("Cement", "Blast_Furnace_Slag", "Fly_Ash", "Water", "Superplasticizer", "Coarse_Aggregate", "Fine_Aggregate", "Age", "Compressive_Strength")
+```
+
+**Show max and min compressive strength values**
+```{r warning=FALSE}
+max(ConDat$Compressive_Strength)
+min(ConDat$Compressive_Strength)
+```
+
+```{r echo = FALSE, warning = FALSE, results='hide', message=FALSE}
+ConDat$Concrete_Category[ConDat$Compressive_Strength <5] <- 1
+ConDat$Concrete_Category[ConDat$Compressive_Strength >=5 & ConDat$Compressive_Strength <20] <- 2
+ConDat$Concrete_Category[ConDat$Compressive_Strength >=20 & ConDat$Compressive_Strength<50] <- 3
+ConDat$Concrete_Category[ConDat$Compressive_Strength >=50] <- 4
+
+ConDat = subset(ConDat, select = -c(9))
+ConDat$Concrete_Category <- factor(x=ConDat$Concrete_Category,
+                                    levels=sort(unique(ConDat$Concrete_Category)),
+                                    labels = c( "Fail", "Low Strength", "Standard Strength", "High Strength"))
+
+summary(ConDat)
+str(ConDat)
+head(ConDat)
+shuffle_index <- sample(1:nrow(ConDat))
+ConDat <- ConDat[shuffle_index, ]
+```
+
+**Table of Concrete Strength Categories**
+
+```{r warning = FALSE}
+table(ConDat$Concrete_Category)
+```
+
+There are 6 Fails, 191 Low Strength, 623 standard strength and 210 High Strength
+
+Proportion Table of Concrete Strength Categories
+
+```{r warning = FALSE}
+prop.table(table(ConDat$Concrete_Category))
+```
+
+In advance of building decision tree model, the dataset Split data into training (80%) and test (20%) datset
+
+```{r echo = FALSE, warning = FALSE, results='hide', message=FALSE}
+set.seed(123)
+DT_Train <- sample(nrow(ConDat),0.8*nrow(ConDat), replace=FALSE)
+DTTrainSet <- ConDat[DT_Train,]
+DTValidSet <- ConDat[-DT_Train,]
+```
+
+
+```{r echo = FALSE, warning = FALSE, results='hide', message=FALSE}
+str(DTTrainSet)
+summary(DTTrainSet)
+head(DTTrainSet)
+table(DTTrainSet$Concrete_Category)
+```
+
+```{r echo = FALSE, warning = FALSE, results='hide', message=FALSE}
+str(ValidSet)
+summary(DTValidSet)
+head(DTValidSet)
+table(DTValidSet$Concrete_Category)
+```
+
+**Build Model using rpart**
+
+```{r echo = FALSE, warning = FALSE}
+dt_model1 <- rpart(Concrete_Category ~., data = DTTrainSet, method = "class")
+```
+
+**Plot the trees**
+
+```{r echo = FALSE, fig.cap="Plot of Decision Tree Model dt_model1", fig.align='center'}
+par(xpd = NA) # avoid clipping the text in some devices
+plot(dt_model1)
+text(dt_model1, digits = 3)
+```
+
+The tree plot is messy and difficult to interpret - It was decided to create a nicer plot using the fancyRpartPlot function
+
+```{r echo = FALSE, fig.cap="fancyRpartPlot of Decision Tree Model dt_model1", fig.align='center'}
+fancyRpartPlot(dt_model1, cex=0.6)
+```
+
+**Make predictions on the test data**
+```{r echo = FALSE, warning=FALSE}
+predicted.classes <- dt_model1 %>%
+  predict(DTValidSet, type = "class")
+head(predicted.classes)
+```
+
+**Compute model accuracy rate on test data**
+```{r echo = FALSE, warning=FALSE}
+mean(predicted.classes==DTValidSet$Concrete_Category)
+```
+
+**Generate Confusion Matrix**
+
+```{r echo = FALSE, warning=FALSE}
+confusionMatrix(predicted.classes,DTValidSet$Concrete_Category)
+```
+
+**Print & Plot cp values**
+```{r echo = FALSE, fig.cap="cp Plot of model dt_model1", fig.align='center'}
+printcp(dt_model1) 
+plotcp(dt_model1)
+```
+
+**Find cp value with lowest cross validation error**
+
+```{r echo = FALSE, warning = FALSE}
+cp <- dt_model1$cptable[which.min(dt_model1$cptable[,"xerror"])]
+cp
+```
+
+**Prune the tree to create a second model dt_model2**
+
+```{r echo = FALSE, warning = FALSE}
+dt_model2 <- prune(dt_model1, cp = 0.01)
+```
+
+**plot the dt_model2 trees**
+
+```{r echo = FALSE, fig.cap="Plot of Decision Tree Model dt_model2", fig.align='center'}
+par(xpd=NA) # Avoid clipping the text in some devices
+plot(dt_model2)
+text(dt_model2, digits=3)
+```
+
+**Generate nicer plot using fancyRpartPlot**
+
+```{r echo = FALSE, fig.cap="fancyRpartPlot of Decision Tree Model dt_model1", fig.align='center'}
+fancyRpartPlot(dt_model2, cex=0.6)
+```
+
+**Make predictions on the test data**
+
+```{r echo = FALSE, warning=FALSE}
+predicted.classes <- dt_model2 %>%
+  predict(DTValidSet, type = "class")
+head(predicted.classes)
+```
+
+**Compute model accuracy rate on test data**
+
+```{r echo = FALSE, warning=FALSE}
+mean(predicted.classes==DTValidSet$Concrete_Category)
+```
+
+**Generate Confusion Matrix**
+
+```{r echo = FALSE, warning=FALSE}
+confusionMatrix(predicted.classes,DTValidSet$Concrete_Category)
+```
+
+**Conclusions from Decision Tree Model**
+The final Decision Tree model has an accuracy of 81% which is a reasonably accurate classification model.  The kappa value is 0.66. The kappa value takes into account chance agreement, and is defined as:
+
+(observed agreement – expected agreement)/(1 – expected agreement).
+
+When two measurements agree only at the chance level, the value of kappa is zero. When the two measurements agree perfectly, the value of kappa is 1.  Sensitivity (also called the true positive rate) measures the percentage of actual positives that are correctly identified. Specificity (also called the true negative rate) measures the percentage of actual negatives that are correctly identified.  Sensitivities and Specificities are reasonably high for this model for most categories.
+
+
+##2.8 - Random Forest Modelling ##
+
+**Inspect pre-processed data**
+
+```{r echo = FALSE, warning = FALSE}
+ConDat <- read_excel("Data/Concrete_Data.xls")
+names(ConDat) <- c("Cement", "Blast_Furnace_Slag", "Fly_Ash", "Water", "Superplasticizer", "Coarse_Aggregate", "Fine_Aggregate", "Age", "Compressive_Strength")
+
+ConDat$Concrete_Category[ConDat$Compressive_Strength <5] <- 1
+ConDat$Concrete_Category[ConDat$Compressive_Strength >=5 & ConDat$Compressive_Strength <20] <- 2
+ConDat$Concrete_Category[ConDat$Compressive_Strength >=20 & ConDat$Compressive_Strength<50] <- 3
+ConDat$Concrete_Category[ConDat$Compressive_Strength >=50] <- 4
+
+ConDat = subset(ConDat, select = -c(9))
+
+ConDat$Concrete_Category <- factor(x=ConDat$Concrete_Category,
+                                   levels=sort(unique(ConDat$Concrete_Category)),
+                                   labels = c( "Fail", "Low Strength", "Standard Strength", "High Strength"))
+str(ConDat)
+summary(ConDat)
+head(ConDat)
+```
+
+Prior to builiding the Random Forest model, the dataset was split intoTraining & Validation sets
+
+
+```{r echo = FALSE, warning = FALSE, results='hide', message=FALSE}
+set.seed(123)
+train <- sample(nrow(ConDat), 0.7*nrow(ConDat), replace = FALSE)
+
+RFTrainSet <- ConDat[train,]
+RFValidSet <- ConDat[-train,]
+summary(RFTrainSet)
+summary(RFValidSet)
+```
+**Create first Random Forest Model using all data apart from Concrete Compressive Strength**
+
+
+```{r echo = FALSE, warning = FALSE}
+rf_model1 <- randomForest(as.factor(Concrete_Category) ~.,
+                               data=RFTrainSet,
+                               importance=TRUE)
+```
+
+**Plot Random Forest model**
+
+```{r echo = FALSE, fig.cap="Plot of Random Forest model rf_model1", fig.align='center'}
+par(xpd=NA) # Avoid clipping the text in some devices
+plot(rf_model1)
+```
+
+**Check which parameters are most influential**
+
+```{r echo = FALSE, warning = FALSE}
+
+rffit <- randomForest(Concrete_Category ~
+                        Cement + 
+                        Blast_Furnace_Slag + 
+                        Fly_Ash +
+                        Water + 
+                        Superplasticizer + 
+                        Coarse_Aggregate + 
+                        Fine_Aggregate + 
+                        Age,
+                      data=RFTrainSet, ntree=2000, keep.forest=FALSE, importance=TRUE)
+
+```
+
+
+```{r echo = FALSE, fig.cap="Plot of most influential parameters", fig.align='center'}
+
+varImpPlot(rffit)
+```
+
+From the plot, the most important variables in the random forest model are age, cement, water and fine aggregate.
+
+**Using For Loop to identify the right mtry for model**
+
+```{r echo = FALSE, warning = FALSE}
+
+a=c()
+i=5
+for (i in 3:6) {rf_model1 <- randomForest(Concrete_Category ~., data =
+                                            RFTrainSet, ntree = 500, mtry = i, importance = TRUE)
+predValid <- predict(rf_model1, RFValidSet, type = "class")
+a[i-2] = mean(predValid ==
+                RFValidSet$Concrete_Category)}
+
+a
+```
+
+
+```{r echo = FALSE, fig.cap="Plot mtry", fig.align='center'}
+plot(3:6, a, pch = 19, cex=3,  main = "Best mtry plot", col = "red")
+
+```
+
+**Fine tuning parameters of Random Forest Model with mtry = 6**
+
+
+```{r echo = FALSE, warning=FALSE}
+
+rf_model2 <- randomForest(Concrete_Category ~., data = RFTrainSet, ntree = 500, mtry = 4, importance = TRUE)
+rf_model2
+```
+
+
+```{r echo = FALSE, fig.cap="Plot of model rf_model1", fig.align='center'}
+par(xpd=NA) # Avoid clipping the text in some devices
+plot(rf_model2)
+```
+
+**Predicting on train set**
+
+```{r echo = FALSE, warning=FALSE}
+
+predTrain <- predict(rf_model2, RFTrainSet, type = "class")
+```
+
+
+**Checking classification accuracy**
+
+
+```{r echo = FALSE, warning+FALSE}
+
+table(predTrain, RFTrainSet$Concrete_Category)
+```
+
+**Predicting on Validation Set**
+
+
+```{r echo = FALSE, warning=FALSE}
+predValid <- predict(rf_model2, RFValidSet, type = "class")
+```
+
+**Checking classification accuracy**
+
+
+```{r echo = FALSE, warning=FALSE}
+mean(predValid == RFValidSet$Concrete_Category)
+table(predValid, RFValidSet$Concrete_Category)
+confusionMatrix(predValid, RFValidSet$Concrete_Category)
+```
+
+
+**Conclusions from Random Forest Model**
+
+The final Random Forest model has an accuracy of 87% which is a reasonably accurate classification model.  The kappa value is 0.76. The kappa value takes into account chance agreement, and is defined as:
+
+(observed agreement – expected agreement)/(1 – expected agreement).
+
+When two measurements agree only at the chance level, the value of kappa is zero. When the two measurements agree perfectly, the value of kappa is 1.  Sensitivity (also called the true positive rate) measures the percentage of actual positives that are correctly identified. Specificity (also called the true negative rate) measures the percentage of actual negatives that are correctly identified.  Sensitivities and Specificities are reasonably high for this model for most categories.  The Random Forest model has a slightly lower balanced accuracy than the decision tree model but the kappa value is higher.  In addition the sensetivities and specificities of the random forest model are higher.
+
+
+##2.9 - Support Vector Machine Modelling ##
+
+```{r echo = FALSE, warning = FALSE, results='hide', message=FALSE}
+ConDat <- read_excel("Data/Concrete_Data.xls")
+
+names(ConDat) <- c("Cement", "Blast_Furnace_Slag", "Fly_Ash", "Water", "Superplasticizer", "Coarse_Aggregate", "Fine_Aggregate", "Age", "Compressive_Strength")
+
+ConDat$Concrete_Category[ConDat$Compressive_Strength <5] <- 1
+ConDat$Concrete_Category[ConDat$Compressive_Strength >=5 & ConDat$Compressive_Strength <20] <- 2
+ConDat$Concrete_Category[ConDat$Compressive_Strength >=20 & ConDat$Compressive_Strength<50] <- 3
+ConDat$Concrete_Category[ConDat$Compressive_Strength >=50] <- 4
+
+# Remove Compressive_Strength column from datframe
+ConDat = subset(ConDat, select = -c(9))
+
+# Convert Concrete_Category to factors
+ConDat$Concrete_Category <- factor(x=ConDat$Concrete_Category,
+                                   levels=sort(unique(ConDat$Concrete_Category)),
+                                   labels = c( "Fail", "Low Strength", "Standard Strength", "High Strength"))
+```
+
+
+**Table of Concrete Category**
+
+```{r echo = FALSE, warning = FALSE}
+table(ConDat$Concrete_Category)
+```
+
+**Proportion Table of Concrete Category**
+
+```{r echo = FALSE, warning = FALSE}
+round(prop.table(table(ConDat$Concrete_Category)), digits=2)
+```
+
+efore building teh SWM model, the datset was scaled and split into Training and Validation datasets.
+
+```{r echo = FALSE, warning = FALSE, results='hide', message=FALSE}
+set.seed(123)
+train <- sample(nrow(ConDat),0.7*nrow(ConDat), replace=FALSE)
+svmTrainSet <- ConDat[train,]
+svmValidSet <- ConDat[-train,]
+
+str(svmTrainSet)
+summary(svmTrainSet)
+head(svmTrainSet)
+table(svmTrainSet$Concrete_Category)
+
+str(svmValidSet)
+summary(svmValidSet)
+head(svmValidSet)
+table(svmValidSet$Concrete_Category)
+```
+
+
+```{r echo = FALSE, warning = FALSE, results='hide', message=FALSE}
+svmTrainSet[-9] = scale(svmTrainSet[-9]) 
+svmValidSet[-9] = scale(svmValidSet[-9]) 
+
+
+str(svmTrainSet)
+summary(svmTrainSet)
+
+
+str(svmValidSet)
+summary(svmValidSet)
+```
+
+**Build SVM classifier model svm_model1 with linear kernel**
+
+```{r echo = FALSE, warning = FALSE}
+svm_model1 = svm(formula = Concrete_Category ~ ., 
+                 data = svmTrainSet, 
+                 type = 'C-classification', 
+                 kernel = 'linear') 
+
+summary(svm_model1)
+```
+
+**Test Model svm_model1 using Validation Set**
+
+```{r echo = FALSE, warning = FALSE}
+svmpred = predict(svm_model1, newdata = svmValidSet[-9])
+
+
+mean(svmpred == svmValidSet$Concrete_Category)
+table(svmpred, svmValidSet$Concrete_Category)
+
+
+confusionMatrix(svmpred, svmValidSet$Concrete_Category)
+```
+
+**Build SVM classifier model svm_model2with radial kernel**
+
+```{r echo = FALSE, warning = FALSE}
+svm_model2 = svm(formula = Concrete_Category ~ ., 
+                 data = svmTrainSet, 
+                 type = 'C-classification', 
+                 kernel = 'radial') 
+
+summary(svm_model2)
+```
+
+**Test Model svm_model2 using Validation Set**
+
+```{r echo = FALSE, warning = FALSE}
+svmpred = predict(svm_model2, newdata = svmValidSet[-9])
+
+
+mean(svmpred == svmValidSet$Concrete_Category)
+table(svmpred, svmValidSet$Concrete_Category)
+
+
+confusionMatrix(svmpred, svmValidSet$Concrete_Category)
+```
+
+**Conclusions from SVM model**
+
+The best Support Vector Machine model was achieved using a radial kernel.  The model has a balanced accuracy of 75% which is a reasonably accurate classification model.  The kappa value is 0.51 which is quite low. The kappa value takes into account chance agreement, and is defined as:
+
+(observed agreement – expected agreement)/(1 – expected agreement).
+
+When two measurements agree only at the chance level, the value of kappa is zero. When the two measurements agree perfectly, the value of kappa is 1.  Sensitivity (also called the true positive rate) measures the percentage of actual positives that are correctly identified. Specificity (also called the true negative rate) measures the percentage of actual negatives that are correctly identified.  Sensitivities and Specificities are moderate to high for this model for most categories.  The SWM model is not as good as either the Decision Tree or Random Forest Models.
+
+
+
+##2.10 - K-Nearest Neighbour Modelling ##
+
+
+```{r echo = FALSE, warning = FALSE, results='hide', message=FALSE}
+ConDat <- read_excel("Data/Concrete_Data.xls")
+
+
+names(ConDat) <- c("Cement", "Blast_Furnace_Slag", "Fly_Ash", "Water", "Superplasticizer", "Coarse_Aggregate", "Fine_Aggregate", "Age", "Compressive_Strength")
+
+
+ConDat$Concrete_Category[ConDat$Compressive_Strength <5] <- 1
+ConDat$Concrete_Category[ConDat$Compressive_Strength >=5 & ConDat$Compressive_Strength <20] <- 2
+ConDat$Concrete_Category[ConDat$Compressive_Strength >=20 & ConDat$Compressive_Strength<50] <- 3
+ConDat$Concrete_Category[ConDat$Compressive_Strength >=50] <- 4
+
+
+ConDat = subset(ConDat, select = -c(9))
+
+ConDat$Concrete_Category <- factor(x=ConDat$Concrete_Category,
+                                   levels=sort(unique(ConDat$Concrete_Category)),
+                                   labels = c( "Fail", "Low Strength", "Standard Strength", "High Strength"))
+```
+
+
+Prior to building the knn model, the dataset was normalized and split into Training and Validation datasets. 
+
+```{r echo = FALSE, warning = FALSE, results='hide', message=FALSE}
+ConDat_n <- as.data.frame(lapply(ConDat[1:8], normalize))
+str(ConDat_n)
+```
+
+
+```{r echo = FALSE, warning = FALSE, results='hide', message=FALSE}
+set.seed(123)
+knnTrainSet <- ConDat_n[1:721, ]  
+knnValidSet <- ConDat_n[722:1030, ]
+
+set.seed(123)
+knnTrainSet_labels <- ConDat[1:721, 9]  
+knnValidSet_labels <- ConDat[722:1030, 9]
+
+
+knnValidSet_pred <- knn(train = knnTrainSet, test = knnValidSet,
+                     cl = knnTrainSet_labels$Concrete_Category, k=4)
+
+CrossTable(x = knnValidSet_labels$Concrete_Category, y = knnValidSet_pred, prop.chisq=FALSE)
+```
+
+
+**Calculate prediction accuracy**
+
+```{r echo = FALSE, warning = FALSE}
+mean(knnValidSet_pred == knnValidSet_labels$Concrete_Category)
+
+
+confusionMatrix(knnValidSet_pred, knnValidSet_labels$Concrete_Category)
+```
+**Conclusions from the K Nearest Neighbour Model**
+
+The model has an accuracy of 65% which is not a very accurate classification model.  The kappa value is 0.21 which is very low. The kappa value takes into account chance agreement, and is defined as:
+
+(observed agreement – expected agreement)/(1 – expected agreement).
+
+When two measurements agree only at the chance level, the value of kappa is zero. When the two measurements agree perfectly, the value of kappa is 1.  Sensitivity (also called the true positive rate) measures the percentage of actual positives that are correctly identified. Specificity (also called the true negative rate) measures the percentage of actual negatives that are correctly identified.  Sensitivities and Specificities are low to moderate for this model for most categories.  The knn model is not as good as the Decision Tree, Random Forest or Support Vector Machines Models.
+
+## 2.11 - Naive-Bayes Modelling ##
+
+
+```{r echo = FALSE, warning = FALSE, results='hide', message=FALSE}
+ConDat <- read_excel("Data/Concrete_Data.xls")
+
+
+names(ConDat) <- c("Cement", "Blast_Furnace_Slag", "Fly_Ash", "Water", "Superplasticizer", "Coarse_Aggregate", "Fine_Aggregate", "Age", "Compressive_Strength")
+
+
+ConDat$Concrete_Category[ConDat$Compressive_Strength <5] <- 1
+ConDat$Concrete_Category[ConDat$Compressive_Strength >=5 & ConDat$Compressive_Strength <20] <- 2
+ConDat$Concrete_Category[ConDat$Compressive_Strength >=20 & ConDat$Compressive_Strength<50] <- 3
+ConDat$Concrete_Category[ConDat$Compressive_Strength >=50] <- 4
+
+ConDat = subset(ConDat, select = -c(9))
+
+
+ConDat$Concrete_Category <- factor(x=ConDat$Concrete_Category,
+                                   levels=sort(unique(ConDat$Concrete_Category)),
+                                   labels = c( "Fail", "Low Strength", "Standard Strength", "High Strength"))
+
+shuffle_index <- sample(1:nrow(ConDat))
+ConDat <- ConDat[shuffle_index, ]
+
+summary(ConDat)
+str(ConDat)
+head(ConDat)
+```
+
+**Table of Concrete Strength Categories**
+
+```{r echo = FALSE, warning = FALSE}
+table(ConDat$Concrete_Category)
+
+round(prop.table(table(ConDat$Concrete_Category)), digits=2)
+```
+
+Prior to building the Naive-Bayes model, the datset was split into Training and Validation sets.
+
+```{r echo = FALSE, warning = FALSE, results='hide', message=FALSE}
+set.seed(123)
+ConDat_train <- sample(nrow(ConDat),0.7*nrow(ConDat), replace=FALSE)
+nbTrainSet <- ConDat[ConDat_train,]
+nbValidSet <- ConDat[-ConDat_train,]
+
+str(nbTrainSet)
+summary(nbTrainSet)
+head(nbTrainSet)
+table(nbTrainSet$Concrete_Category)
+
+
+str(nbValidSet)
+summary(nbValidSet)
+head(nbValidSet)
+table(nbValidSet$Concrete_Category)
+```
+
+**Build Naive-Bayes Model nb_model1**
+
+```{r echo = FALSE, warning = FALSE}
+nb_model1 <- naive_bayes(Concrete_Category ~ ., nbTrainSet, laplace = 0)
+nb_model1
+summary(nb_model1)
+```
+
+
+**Plot Naive-Bayes Model**
+
+```{r echo = FALSE, fig.cap="Plot of Naive-Bayes Model", fig.align='center'}
+par(mfrow=c(1,1))
+plot(nb_model1, ask = TRUE)
+```
+
+**Predict using model and Validation Set**
+
+```{r echo = FALSE, warning = FALSE}
+nbPred <- predict(nb_model1, nbValidSet, type = "class")
+```
+
+**Check model Accuracy using Validation Set**
+
+```{r echo = FALSE, warning = FALSE}
+mean(nbPred == nbValidSet$Concrete_Category)
+table(nbPred, nbValidSet$Concrete_Category)
+confusionMatrix(nbPred, nbValidSet$Concrete_Category)
+```
+
+**Conclusions from the Naive-Bayes Model**
+
+The model has an accuracy of 52% which is not a very accurate classification model.  The kappa value is 0.24 which is very low. The kappa value takes into account chance agreement, and is defined as:
+
+(observed agreement – expected agreement)/(1 – expected agreement).
+
+When two measurements agree only at the chance level, the value of kappa is zero. When the two measurements agree perfectly, the value of kappa is 1.  Sensitivity (also called the true positive rate) measures the percentage of actual positives that are correctly identified. Specificity (also called the true negative rate) measures the percentage of actual negatives that are correctly identified.  Sensitivities and Specificities are low to moderate for this model for most categories.  The Naive-Bayes model was the least accurate of the models built.
+
+
+#3.0 Results#
+
+The model accuracy for each of the models is detailed below.
+
+``` {r echo = FALSE, warning = FALSE}
+mlr <- c(0.90, 0.89,
+         7.31, 0.22, NA)
+ann <- c( 0.79, NA, 
+          NA, NA, NA)
+dt <- c(0.81, NA,
+        NA, NA, 0.66)
+rf <- c(0.87, NA,
+        NA, NA, 0.76)
+svm <- c(0.77, NA,
+         NA, NA, 0.51)
+knn <-  c(0.66, NA,
+          NA, NA, 0.21 )
+nb <-  c(0.52, NA,
+         NA, NA, 0.24)
+
+df <- data.frame(mlr, ann, dt, rf, svm, knn, nb)
+
+rownames(df) <- c("Accuracy", "Adjusted R-Squared", 
+                  "RMSE", "MAPE", "Kappa")
+colnames(df) <- c("Multiple Linear Regression", "Artificial Neural Network", "Decision Trees",
+                  "Random Forest", "Support Vector Machine", "K Nearest Neighbour", "Naive-Bayes")
+
+df_transpose = t(df)
+
+kable(df, caption = "Table of Concrete Compressive Strength M/L Model Results")
+```
+
+#4.0 Conclusion/Discussion
+
+During this project a number of machine learning algorithms were used to build models to predict concrete compressive strengtth:
+
+* Multiple Linear Regression (MLR)
+* Artificial Neural Networks (Ann)
+* Decision Trees
+* Random Forest
+* Support Vector Machine (SVM)
+* K Nearest Neighbour (Knn)
+* Naive-Bayes
+
+For the multiple linear regression and artificial neural networks models, the concrete compressive strength data was left as continous data.  However for the clssification algorithms (Decition Trees, Random Forest, Support Vector Machine, K nearest neighbour, Naive-Bayes), it was decided to Create four categories for the concrete compressive strength data based on typical classification found in industry:
+
+- Fail - <5Mpa
+- Low Strength 5-19MPa
+- Standard Strength 20-49MPa
+- High Strength >= 50MPa
+
+Based on the initial exploratory data abnalysis, it appeared that that the most significant positive correlations were achieved for Cement (0.4978327), Superplasticizer (0.3661023) and Age (0.32887).  The most significant negative correlation is for Water (-0.2896135). 
+
+
+**Multiple Linear Regression Model**
+
+The majority of the project effort focused on the The multiple linear regression model.  None of the correlations are very strong which (in conjunction with the observatiuons from the scatterplots) indicated that the relationships between Compressive_Strength and the other attributes in the dataset may be non-linear and required  further transformation to develop a more accurate linear regression model. Through research and data transformations  The final model has an accuracy of approximately 90% (0.8979650) which is quite an accurate model.  The final Multiple Linear Regression model (after transformation of the data) has an accuracy of 90% which represents a good model. The Adjusted R-squared value is 0.8081 which means that the model explains about 80% of the variability.  The RMSE of the model is 7.3 and the MAPE is only 0.22 indicating a reasonably accurate model.  The model meets all of the assumptions for a regression model apart from normality.  Homoscedasticity and linearity tend to be more important than normality for linear regression models and with large datasets, normality of lesser importance for a model to be valid.  (Schmidt, A. F. & Finan, C., 2018. Linear regression and the normality assumption. Journal of Clinical Epidemiology, Volume 98, pp. 146-151).  As the Training dataset has >800 data points, the requirement for normality for the model to be valid is less important. 
+
+**Artificial Neural Network Model**
+
+The best ANN model (after transformation of the data) was achieved using 5 hidden neurons and logistic activation function.  The model has an accuracy of 79% which represents a reasobally accurate model.  THis model is not as good as the multiple linear regression model.  ANN is best used for very large datasets rather than small data sets like this.
+
+**Decision Tree Model**
+
+The best Decision Tree model has an accuracy of 81% which is a reasonably accurate classification model.  The kappa value is 0.66. The kappa value takes into account chance agreement, and is defined as:
+
+* (observed agreement – expected agreement)/(1 – expected agreement).
+
+When two measurements agree only at the chance level, the value of kappa is zero. When the two measurements agree perfectly, the value of kappa is 1.  Sensitivity (also called the true positive rate) measures the percentage of actual positives that are correctly identified. Specificity (also called the true negative rate) measures the percentage of actual negatives that are correctly identified.  Sensitivities and Specificities are reasonably high for this model for most categories.
+
+**Random Forest Model**
+
+The final Random Forest model has an accuracy of 87% which is a reasonably accurate classification model.  The kappa value is 0.76. Sensitivities and Specificities are reasonably high for this model for most categories.  The Random Forest model has a slightly lower balanced accuracy than the decision tree model but the kappa value is higher.  In addition the sensetivities and specificities of the random forest model are higher.
+
+**Support Vector Machine Model**
+
+The best Support Vector Machine model was achieved using a radial kernel.  The model has a balanced accuracy of 75% which is a reasonably accurate classification model.  The kappa value is 0.51 which is quite low. Sensitivities and Specificities are moderate to high for this model for most categories.  The SWM model is not as good as either the Decision Tree or Random Forest Models.
+
+**K Nearest Neighbour Model**
+
+The knn model has an accuracy of 65% which is not a very accurate classification model.  The kappa value is 0.21 which is very low. Sensitivities and Specificities are low to moderate for this model for most categories.  The knn model is not as good as the Decision Tree, Random Forest or Support Vector Machines Models.
+
+**K Naive-Bayes Model**
+
+The model has a balanced accuracy of 52% which is not a very accurate classification model.  The kappa value is 0.24 which is very low.  Sensitivities and Specificities are low to moderate for this model for most categories.  The Naive-Bayes model was the least accurate of the models built
+
+**Overall Conclusion**
+
+In summary, the best model was achieved using multiple linear regression.  The best classification model werse achieved using the Random Forest algorithm.  The worst models were obtained using knn and Naive-Bayes algorithms.
